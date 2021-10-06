@@ -1,21 +1,31 @@
 import express from "express";
 import bodyParser from "body-parser";
-
-const articlesInfo = {
-  "learn-react": {
-    upvotes: 0,
-  },
-  "learn-node": {
-    upvotes: 0,
-  },
-  "my-thoughts-on-resumes": {
-    upvotes: 0,
-  },
-};
+import { MongoClient } from "mongodb";
 
 const app = express();
 
 app.use(bodyParser.json());
+
+app.get("/api/articles/:name", async (req, res) => {
+  try {
+    const articleName = req.params.name;
+    const client = await MongoClient.connect(
+      "mongodb://eric:123456@localhost:8301",
+      {
+        useNewUrlParser: true,
+      }
+    );
+
+    const db = client.db("my-blog");
+    const articleInfo = await db
+      .collection("articles")
+      .findOne({ name: articleName });
+    res.status(200).json(articleInfo);
+    client.close();
+  } catch (error) {
+    res.status(500).json({ message: "Error connecting to db", error });
+  }
+});
 
 app.post("/api/articles/:name/upvote", (req, res) => {
   const articleName = req.params.name;
@@ -26,4 +36,13 @@ app.post("/api/articles/:name/upvote", (req, res) => {
       `${articleName} now has ${articlesInfo[articleName].upvotes} upvotes.`
     );
 });
+
+app.post("/api/articles/:name/add-comment", (req, res) => {
+  const { username, text } = req.body;
+  const articleName = req.params.name;
+
+  articlesInfo[articleName].comments.push({ username, text });
+  res.status(200).send(articlesInfo[articleName]);
+});
+
 app.listen(8000, () => console.log("Listening on port 8000"));
